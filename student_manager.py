@@ -5,7 +5,7 @@ import datetime
 import json
 import os
 
-from utils import format_name, format_name_for_report, validate_email, log_action
+from utils import format_name_for_report, get_letter_grade, validate_email, log_action
 
 
 class StudentManager:
@@ -23,94 +23,68 @@ class StudentManager:
     def add_student(self, student):
         self.students.append(student)
 
-    # This is the main processing method
+    def _send_notification(self, student, message, notification_type):
+        if not validate_email(student.email):
+            return
+        self.notification_log.append({
+            "to": student.email,
+            "message": message,
+            "sent_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "type": notification_type
+        })
+        log_action("NOTIFICATION", f"{notification_type.title()} notification sent to {student.email}")
+
+    def _process_grade(self, student, send_notifications, notification_prefix):
+        avg = sum(student.grades) / len(student.grades) if student.grades else 0
+        letter = get_letter_grade(avg)
+        student.final_grade = letter
+        student.gpa = avg / 25
+        student.scholarship_eligible = avg >= 85 and student.attendance_count >= 35
+
+        if send_notifications:
+            message = (
+                f"{notification_prefix} {student.name}, your grade is {letter} "
+                f"(GPA: {round(student.gpa, 2)})"
+            )
+            self._send_notification(student, message, "grade")
+
+    def _process_attendance(self, student, send_notifications, notification_prefix, min_attendance_pct, include_warnings):
+        total_classes = 40
+        rate = student.attendance_count / total_classes * 100
+        student.warning = rate < min_attendance_pct
+
+        if student.warning and include_warnings:
+            warning_note = f"Low attendance warning: {round(rate, 1)}%"
+            if warning_note not in student.notes:
+                student.notes.append(warning_note)
+
+        if student.warning and send_notifications:
+            message = f"{notification_prefix} {student.name}, attendance warning: {round(rate, 1)}%"
+            self._send_notification(student, message, "attendance")
+
+    def _process_status(self, student):
+        if student.final_grade == "F":
+            student.status = "probation"
+        elif student.warning:
+            student.status = "warning"
+        else:
+            student.status = "good_standing"
+
     def process_students(self, mode, output_dir, send_notifications,
                          notification_prefix, min_attendance_pct,
                          include_warnings, export_format):
         results = []
-        # Process each student based on the mode
         for s in self.students:
             if mode == "grade":
-                # Calculate the average grade for the student
-                total = 0
-                count = 0
-                for g in s.grades:
-                    total = total + g
-                    count = count + 1
-                if count > 0:
-                    avg = total / count
-                else:
-                    avg = 0
-
-                # Determine the letter grade based on thresholds
-                if avg >= 90:
-                    letter = "A"
-                elif avg >= 80:
-                    letter = "B"
-                elif avg >= 70:
-                    letter = "C"
-                elif avg >= 60:
-                    letter = "D"
-                else:
-                    letter = "F"
-
-                s.final_grade = letter
-                s.gpa = avg / 25  # Convert to 4.0 scale
-
-                # Check scholarship eligibility
-                if avg >= 85 and s.attendance_count >= 35:
-                    s.scholarship_eligible = True
-
+                self._process_grade(s, send_notifications, notification_prefix)
                 results.append(s)
                 self.processed_count += 1
-
-                # Send notification if enabled
-                if send_notifications:
-                    if validate_email(s.email):
-                        msg = notification_prefix + " " + s.name + ", your grade is " + letter
-                        msg += " (GPA: " + str(round(s.gpa, 2)) + ")"
-                        self.notification_log.append({
-                            "to": s.email,
-                            "message": msg,
-                            "sent_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            "type": "grade"
-                        })
-                        log_action("NOTIFICATION", f"Grade notification sent to {s.email}")
-
             elif mode == "attendance":
-                # Calculate attendance percentage
-                total_classes = 40  # total classes in semester
-                attended = s.attendance_count
-                rate = attended / total_classes * 100
-
-                if rate < min_attendance_pct:
-                    s.warning = True
-                    if include_warnings:
-                        s.notes.append("Low attendance warning: " + str(round(rate, 1)) + "%")
-
-                    # Send notification if enabled
-                    if send_notifications:
-                        if validate_email(s.email):
-                            msg = notification_prefix + " " + s.name + ", attendance warning: " + str(round(rate, 1)) + "%"
-                            self.notification_log.append({
-                                "to": s.email,
-                                "message": msg,
-                                "sent_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                "type": "attendance"
-                            })
-                            log_action("NOTIFICATION", f"Attendance warning sent to {s.email}")
-
+                self._process_attendance(s, send_notifications, notification_prefix, min_attendance_pct, include_warnings)
                 results.append(s)
                 self.processed_count += 1
-
             elif mode == "status":
-                # Update student status based on grades and attendance
-                if s.final_grade == "F":
-                    s.status = "probation"
-                elif s.warning:
-                    s.status = "warning"
-                else:
-                    s.status = "good_standing"
+                self._process_status(s)
                 results.append(s)
                 self.processed_count += 1
 
@@ -143,7 +117,7 @@ class StudentManager:
                 formatted = format_name_for_report(s.name)
                 line = f"  {formatted:<30} | Grade: {s.final_grade or 'N/A':<3} | GPA: {s.gpa or 0:.2f}"
                 if s.scholarship_eligible:
-                    line += " | ★ SCHOLARSHIP"
+                    line += " | SCHOLARSHIP"
                 lines.append(line)
 
             if include_summary:
@@ -188,7 +162,7 @@ class StudentManager:
             for s in sorted_students:
                 formatted = format_name_for_report(s.name)
                 rate = s.attendance_count / 40 * 100
-                status_mark = "⚠️" if s.warning else "✓"
+                status_mark = "WARN" if s.warning else "OK"
                 line = f"  {formatted:<30} | Attended: {s.attendance_count}/40 ({rate:.0f}%) {status_mark}"
                 lines.append(line)
 

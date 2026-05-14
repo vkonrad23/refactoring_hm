@@ -1,34 +1,33 @@
-# models.py - Student data models
-# This file contains all the data structures for the system
-# Author: [Original Developer]
-# Date: 2024-01-15
-# Modified: 2024-03-20, 2024-05-11, 2024-06-03, 2024-09-17
+from dataclasses import asdict, dataclass, field
+from typing import Optional
 
+
+@dataclass
 class Student:
-    def __init__(self, name, student_id, email, grades, attendance_count,
-                 year, major, phone, address, emergency_contact,
-                 enrollment_date, is_international):
-        self.name = name
-        self.student_id = student_id
-        self.email = email
-        self.grades = grades
-        self.attendance_count = attendance_count
-        self.year = year
-        self.major = major
-        self.phone = phone
-        self.address = address
-        self.emergency_contact = emergency_contact
-        self.enrollment_date = enrollment_date
-        self.is_international = is_international
-        self.final_grade = None
-        self.gpa = None
-        self.warning = False
-        self.status = "active"
-        self.notes = []
-        self.scholarship_eligible = False
+    name: str
+    student_id: int
+    email: str
+    grades: list[int]
+    attendance_count: int
+    year: int
+    major: str
+    phone: str
+    address: str
+    emergency_contact: str
+    enrollment_date: str
+    is_international: bool
+    final_grade: Optional[str] = None
+    gpa: Optional[float] = None
+    warning: bool = False
+    status: str = "active"
+    notes: list[str] = field(default_factory=list)
+    scholarship_eligible: bool = False
+
+    def __post_init__(self):
         # TODO: add support for multiple semesters
         # TODO: add GPA history tracking
         # TODO: integrate with university API
+        pass
 
     # This method converts student to a string
     def to_string(self):
@@ -36,24 +35,7 @@ class Student:
 
     # This method converts student to a dictionary
     def to_dict(self):
-        d = {}
-        d["name"] = self.name
-        d["student_id"] = self.student_id
-        d["email"] = self.email
-        d["grades"] = self.grades
-        d["attendance_count"] = self.attendance_count
-        d["year"] = self.year
-        d["major"] = self.major
-        d["phone"] = self.phone
-        d["address"] = self.address
-        d["emergency_contact"] = self.emergency_contact
-        d["enrollment_date"] = self.enrollment_date
-        d["is_international"] = self.is_international
-        d["final_grade"] = self.final_grade
-        d["gpa"] = self.gpa
-        d["warning"] = self.warning
-        d["status"] = self.status
-        return d
+        return asdict(self)
 
     # This method checks if two students are equal
     def is_equal(self, other):
