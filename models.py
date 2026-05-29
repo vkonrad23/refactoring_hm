@@ -2,6 +2,14 @@ from dataclasses import asdict, dataclass, field
 from typing import Optional
 
 
+CREDITS_BY_YEAR = {
+    1: 30,
+    2: 60,
+    3: 90,
+    4: 120,
+}
+
+
 @dataclass
 class Student:
     name: str
@@ -23,51 +31,27 @@ class Student:
     notes: list[str] = field(default_factory=list)
     scholarship_eligible: bool = False
 
-    def __post_init__(self):
-        # TODO: add support for multiple semesters
-        # TODO: add GPA history tracking
-        # TODO: integrate with university API
-        pass
+    def to_string(self) -> str:
+        return f"{self.name} ({self.student_id})"
 
-    # This method converts student to a string
-    def to_string(self):
-        return self.name + " (" + str(self.student_id) + ")"
-
-    # This method converts student to a dictionary
-    def to_dict(self):
+    def to_dict(self) -> dict:
         return asdict(self)
 
-    # This method checks if two students are equal
-    def is_equal(self, other):
-        if other is None:
-            return False
-        return self.student_id == other.student_id
+    def is_equal(self, other: object) -> bool:
+        return isinstance(other, Student) and self.student_id == other.student_id
 
-    # Legacy method - kept for backward compatibility
-    def get_full_info(self):
-        info = "Student: " + self.name + "\n"
-        info += "ID: " + str(self.student_id) + "\n"
-        info += "Email: " + self.email + "\n"
-        info += "Year: " + str(self.year) + "\n"
-        info += "Major: " + self.major + "\n"
-        info += "Phone: " + self.phone + "\n"
-        info += "Address: " + self.address + "\n"
-        info += "Emergency: " + self.emergency_contact + "\n"
-        return info
+    def get_full_info(self) -> str:
+        return "\n".join([
+            f"Student: {self.name}",
+            f"ID: {self.student_id}",
+            f"Email: {self.email}",
+            f"Year: {self.year}",
+            f"Major: {self.major}",
+            f"Phone: {self.phone}",
+            f"Address: {self.address}",
+            f"Emergency: {self.emergency_contact}",
+            "",
+        ])
 
-    # Never used but might be needed later
-    def calculate_credits(self):
-        if self.year == 1:
-            return 30
-        elif self.year == 2:
-            return 60
-        elif self.year == 3:
-            return 90
-        elif self.year == 4:
-            return 120
-        else:
-            return 0
-
-    # Experimental feature - not yet implemented
-    def predict_graduation(self):
-        pass
+    def calculate_credits(self) -> int:
+        return CREDITS_BY_YEAR.get(self.year, 0)
